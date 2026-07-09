@@ -7,6 +7,7 @@ glucose = np.empty(len(days))
 product = np.empty(len(days))
 viable_cells = np.empty(len(days))
 dead_cells = np.empty(len(days))
+kd = np.empty(len(days))
 
 
 # Initial conditions
@@ -22,20 +23,24 @@ qG = 600.0  # picograms / (cell . day)
 dt = 1.0  # time step in days
 qp = 30.0  # picograms / (cell . day)
 
-#cell viability parameters
-k_d = 0.05  # death rate constant (1/day)
+#cell viability parameters for dynamic death rate
+kd_min = 0.02  # 1/day, death rate when glucose is high
+kd_max = 0.20  # 1/day, death rate when glucose is depleted
+kd[0] = kd_min # 1/day, initial death rate
 
 #Cell Viability Model
 for i in range(1, len(days)):
     mu = mu_max * glucose[i-1] / (Ks + glucose[i-1])  # Monod equation for growth rate
+    health_factor = glucose[i-1] / (Ks + glucose[i-1])
+    kd[i] = kd_min + (kd_max - kd_min) * (1 - health_factor)
     cells_per_L = viable_cells[i-1] * 1e9  # million cells/mL to cells/L conversion factor
     glucose[i] = glucose[i-1] - (qG * cells_per_L * 1e-12 * dt)  # Glucose consumption
-    glucose[i] = max(glucose[i], 0)  # Prevent negative glucose concentration
+    glucose[i] = np.maximum(glucose[i], 0)  # Prevent negative glucose concentration
     product[i] = product[i-1] + (qp * cells_per_L * 1e-12 * dt)  # Product formation
-    dead_today = k_d * viable_cells[i-1] * dt  # Number of cells that die today
+    dead_today = kd[i] * viable_cells[i-1] * dt  # Number of cells that die today
     new_cells = viable_cells[i-1] * (np.exp(mu * dt) - 1)  # New viable cells produced
     viable_cells[i] = viable_cells[i-1] + new_cells - dead_today  # Viable cell growth and death
-    viable_cells[i] = max(viable_cells[i], 0)
+    viable_cells[i] = np.maximum(viable_cells[i], 0)
     dead_cells[i] = dead_cells[i-1] + dead_today  # Accumulation of dead cells
 
 total_cells = viable_cells + dead_cells
@@ -72,4 +77,14 @@ plt.xlabel("Days")
 plt.ylabel("Viability (%)")
 plt.legend()
 plt.grid()  
+plt.show()
+
+#Figure 4
+plt.figure(figsize=(8,5))
+plt.plot(days, kd, label = "Death Rate", color='black')
+plt.title("Cell Death Rate Over Time")
+plt.xlabel("Days")
+plt.ylabel("Death Rate (1/day)")
+plt.legend()
+plt.grid()
 plt.show()
