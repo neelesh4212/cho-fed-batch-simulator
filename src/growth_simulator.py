@@ -43,6 +43,25 @@ def calculate_growth(viable_cells, mu, dt):
 
     return new_cells
 
+def calculate_feed_rate(
+        reactor_volume_previous, 
+        max_feed_volume, 
+        glucose_previous, 
+        glucose_target, 
+        feed_rate_on, 
+        dt,
+):
+    if reactor_volume_previous >= max_feed_volume or glucose_previous >= glucose_target:
+        feed_rate = 0.0
+
+    else:
+        feed_rate = feed_rate_on
+
+    feed_rate = min(
+        feed_rate, 
+        max(((max_feed_volume - reactor_volume_previous) / dt), 0.0))
+
+    return feed_rate
 
 def update_metabolites(
     glucose_previous,
@@ -72,25 +91,42 @@ def update_metabolites(
     glucose_new = (
         glucose_previous_mass + glucose_added - actual_glucose_consumed
     ) / reactor_volume_new  # g/L
-    product_new = product_previous + (dynamic_qp * cells_per_L * 1e-12 * dt)  # g/L
 
-    lactate_change = qL_dynamic * cells_per_L * 1e-12 * dt  # g/L
-    lactate_new = max(lactate_previous + lactate_change, 0)  # g/L
+    product_previous_mass = product_previous * reactor_volume_previous  # g
+    product_formed = dynamic_qp * cells_per_L * 1e-12 * dt * reactor_volume_previous  # g
+    product_new = (product_previous_mass + product_formed) / reactor_volume_new  # g/L
 
-    ammonia_new = ammonia_previous + (qA * cells_per_L * 1e-12 * dt)  # g/L
+    lactate_previous_mass = lactate_previous * reactor_volume_previous  # g
+    lactate_change = qL_dynamic * cells_per_L * 1e-12 * dt * reactor_volume_previous  # g
+    lactate_new = (lactate_previous_mass + lactate_change) / reactor_volume_new  # g/L
+    lactate_new = max(lactate_new, 0)  # Prevent negative lactate concentration
+
+    ammonia_previous_mass = ammonia_previous * reactor_volume_previous  # g
+    ammonia_formed = qA * cells_per_L * 1e-12 * dt * reactor_volume_previous  # g
+    ammonia_new = (ammonia_previous_mass + ammonia_formed) / reactor_volume_new
 
     return glucose_new, product_new, lactate_new, ammonia_new
 
 
-def update_cells(viable_cells_previous, dead_cells_previous, mu, kd, dt):
+def update_cells(viable_cells_previous, reactor_volume_previous, reactor_volume_new, dead_cells_previous, mu, kd, dt):
+    viable_cells_previous_mass = viable_cells_previous * 1e9 * reactor_volume_previous  # cells
     new_cells = calculate_growth(viable_cells_previous, mu, dt)  # million cells/mL
+    new_cells_mass = new_cells * 1e9 * reactor_volume_previous  # cells
+
     dead_today = kd * viable_cells_previous * dt  # million cells/mL
     dead_today = min(dead_today, viable_cells_previous + new_cells)
+    dead_today_mass = dead_today * 1e9 * reactor_volume_previous  # cells
 
-    viable_cells_new = viable_cells_previous + new_cells - dead_today  # million cells/mL
+    viable_cells_new = (((viable_cells_previous_mass + new_cells_mass - dead_today_mass)/
+                        reactor_volume_new/
+                        1e9)
+    )  # million cells/mL
     viable_cells_new = max(viable_cells_new, 0)
 
-    dead_cells_new = dead_cells_previous + dead_today  # million cells/mL
+    dead_cells_new = (((dead_cells_previous * 1e9 * reactor_volume_previous) + dead_today_mass) / 
+                      reactor_volume_new / 
+                      1e9
+    )  # million cells/mL
 
     return viable_cells_new, dead_cells_new
 
@@ -278,7 +314,7 @@ def main():
     # ----------------------------
 
     reactor_volume[0] = 1.0  # L
-    glucose[0] = 30.0  # g/L
+    glucose[0] = 8.0  # g/L
     initial_cells = 1.0  # million cells/mL
     product[0] = 0.0  # g/L
     viable_cells[0] = initial_cells  # million cells/mL
@@ -290,8 +326,11 @@ def main():
     # Feed Parameters
     # ----------------------------
 
-    feed_glucose = 500.0  # g/L, glucose concentration in feed
-    feed_rate[days >= 5] = 0.2  # L/day, feed used from Day 5 onward
+    feed_glucose = 100.0  # g/L, glucose concentration in feed
+    feed_rate_on = 0.1  # L/day
+    glucose_target = 10.0  # g/L, target glucose concentration
+    max_feed_volume = 1.5  # L, maximum reactor volume for feeding
+    # reactor_capacity = 2.0  # L, maximum reactor volume
 
     # ----------------------------
     # Growth Parameters
@@ -360,6 +399,15 @@ def main():
 
     for i in range(1, len(days)):
 
+        feed_rate[i-1] = calculate_feed_rate(
+            reactor_volume[i-1],
+            max_feed_volume,
+            glucose[i-1],
+            glucose_target,
+            feed_rate_on,
+            dt,
+        )
+
         health_factor = calculate_health(
             glucose[i-1],
             lactate[i-1],
@@ -417,6 +465,8 @@ def main():
 
         viable_cells[i], dead_cells[i] = update_cells(
             viable_cells[i-1],
+            reactor_volume[i-1],
+            reactor_volume[i],
             dead_cells[i-1],
             mu[i],
             kd[i],
