@@ -1,4 +1,7 @@
+import os
+
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
 
@@ -129,7 +132,6 @@ def update_cells(viable_cells_previous, reactor_volume_previous, reactor_volume_
     )  # million cells/mL
 
     return viable_cells_new, dead_cells_new
-
 
 # =====================================================
 # PLOTTING FUNCTIONS
@@ -479,6 +481,33 @@ def main():
 
     total_cells = viable_cells + dead_cells  # million cells/mL
     viability = viable_cells / total_cells * 100  # %
+
+# =====================================================
+# CREATING DATAFRAMES
+# =====================================================
+
+    results = pd.DataFrame({
+        "Days": days, 
+        "Glucose (g/L)": glucose,
+        "Product (g/L)": product,
+        "Lactate (g/L)": lactate,
+        "Ammonia (g/L)": ammonia,
+        "Viable Cells (million cells/mL)": viable_cells,
+        "Dead Cells (million cells/mL)": dead_cells,
+        "Total Cells (million cells/mL)": total_cells,
+        "Viability (%)": viability,
+        "Growth Rate (1/day)": mu,
+        "Death Rate (1/day)": kd,
+        "Metabolic State": metabolic_state,
+        "Dynamic qL (pg/(cell.day))": dynamic_qL,
+        "Reactor Volume (L)": reactor_volume,
+        "Feed Rate (L/day)": feed_rate
+    })
+
+    results.to_csv(
+    "data/csv/simulation_2026-08-08_1030.csv",
+    index=False
+    )
 
     # ----------------------------
     # Plot
