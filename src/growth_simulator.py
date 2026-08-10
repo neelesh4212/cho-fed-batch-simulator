@@ -1,7 +1,6 @@
-import os
-
 import numpy as np
 import pandas as pd
+import sqlite3
 import matplotlib.pyplot as plt
 
 
@@ -297,7 +296,7 @@ def main():
     # ----------------------------
 
     days = np.arange(0, 15)  # days
-
+    
     reactor_volume = np.empty(len(days))  # L
     feed_rate = np.zeros(len(days))  # L/day
     glucose = np.empty(len(days))  # g/L
@@ -330,7 +329,7 @@ def main():
 
     feed_glucose = 100.0  # g/L, glucose concentration in feed
     feed_rate_on = 0.1  # L/day
-    glucose_target = 10.0  # g/L, target glucose concentration
+    glucose_target = 8.0  # g/L, target glucose concentration
     max_feed_volume = 1.5  # L, maximum reactor volume for feeding
     # reactor_capacity = 2.0  # L, maximum reactor volume
 
@@ -482,11 +481,43 @@ def main():
     total_cells = viable_cells + dead_cells  # million cells/mL
     viability = viable_cells / total_cells * 100  # %
 
-# =====================================================
-# CREATING DATAFRAMES
-# =====================================================
 
+    connection = sqlite3.connect("data/database/cho_digital_twin.db")
+    
+    connection.execute("""
+        CREATE TABLE IF NOT EXISTS simulation_results (
+            Simulation_ID INTEGER,
+            Days INTEGER,
+            Glucose REAL,
+            Product REAL,
+            Lactate REAL,
+            Ammonia REAL,
+            Viable_Cells REAL,
+            Dead_Cells REAL,
+            Total_Cells REAL,
+            Viability REAL,
+            Growth_Rate REAL,
+            Death_Rate REAL,
+            Metabolic_State REAL,
+            Dynamic_qL REAL,
+            Reactor_Volume REAL,
+            Feed_Rate REAL
+        )
+        """)
+    
+    next_sim_id = connection.execute("""
+    SELECT COALESCE(MAX(Simulation_ID), 0) + 1 AS Next_Simulation_ID
+    FROM simulation_results
+    """)
+
+    simulation_id = next_sim_id.fetchone()[0]
+
+    # =====================================================
+    # CREATING DATAFRAMES
+    # =====================================================
+    
     results = pd.DataFrame({
+        "Simulation_ID": simulation_id,
         "Days": days, 
         "Glucose (g/L)": glucose,
         "Product (g/L)": product,
@@ -504,8 +535,36 @@ def main():
         "Feed Rate (L/day)": feed_rate
     })
 
+    database_results = results.rename(columns={
+        "Simulation_ID": "Simulation_ID",
+        "Days": "Days",
+        "Glucose (g/L)": "Glucose",
+        "Product (g/L)": "Product",
+        "Lactate (g/L)": "Lactate",
+        "Ammonia (g/L)": "Ammonia",
+        "Viable Cells (million cells/mL)": "Viable_Cells",
+        "Dead Cells (million cells/mL)": "Dead_Cells",
+        "Total Cells (million cells/mL)": "Total_Cells",
+        "Viability (%)": "Viability",
+        "Growth Rate (1/day)": "Growth_Rate",
+        "Death Rate (1/day)": "Death_Rate",
+        "Metabolic State": "Metabolic_State",
+        "Dynamic qL (pg/(cell.day))": "Dynamic_qL",
+        "Reactor Volume (L)": "Reactor_Volume",
+        "Feed Rate (L/day)": "Feed_Rate"
+    })
+
+    database_results.to_sql(
+        "simulation_results",
+        connection,
+        if_exists="append",
+        index=False
+    )
+
+    connection.close()
+
     results.to_csv(
-    "data/csv/simulation_2026-08-08_1030.csv",
+    "data/csv/simulation_2026-08-10_1030.csv",
     index=False
     )
 
@@ -513,22 +572,22 @@ def main():
     # Plot
     # ----------------------------
 
-    plot_results(
-        days,
-        viable_cells,
-        dead_cells,
-        total_cells,
-        glucose,
-        product,
-        viability,
-        kd,
-        mu,
-        lactate,
-        ammonia,
-        metabolic_state,
-        dynamic_qL, 
-        reactor_volume
-    )
+    # plot_results(
+    #     days,
+    #     viable_cells,
+    #     dead_cells,
+    #     total_cells,
+    #     glucose,
+    #     product,
+    #     viability,
+    #     kd,
+    #     mu,
+    #     lactate,
+    #     ammonia,
+    #     metabolic_state,
+    #     dynamic_qL, 
+    #     reactor_volume
+    # )
 
 
 # =====================================================
