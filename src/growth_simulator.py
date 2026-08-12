@@ -327,9 +327,9 @@ def main():
     # Feed Parameters
     # ----------------------------
 
-    feed_glucose = 100.0  # g/L, glucose concentration in feed
+    feed_glucose = 120.0  # g/L, glucose concentration in feed
     feed_rate_on = 0.1  # L/day
-    glucose_target = 8.0  # g/L, target glucose concentration
+    glucose_target = 10.0  # g/L, target glucose concentration
     max_feed_volume = 1.5  # L, maximum reactor volume for feeding
     # reactor_capacity = 2.0  # L, maximum reactor volume
 
@@ -564,7 +564,7 @@ def main():
     connection.close()
 
     results.to_csv(
-    "data/csv/simulation_2026-08-10_1030.csv",
+    "data/csv/simulation_2026-08-12_1125.csv",
     index=False
     )
 
@@ -572,22 +572,22 @@ def main():
     # Plot
     # ----------------------------
 
-    # plot_results(
-    #     days,
-    #     viable_cells,
-    #     dead_cells,
-    #     total_cells,
-    #     glucose,
-    #     product,
-    #     viability,
-    #     kd,
-    #     mu,
-    #     lactate,
-    #     ammonia,
-    #     metabolic_state,
-    #     dynamic_qL, 
-    #     reactor_volume
-    # )
+    plot_results(
+        days,
+        viable_cells,
+        dead_cells,
+        total_cells,
+        glucose,
+        product,
+        viability,
+        kd,
+        mu,
+        lactate,
+        ammonia,
+        metabolic_state,
+        dynamic_qL, 
+        reactor_volume
+    )
 
 
 # =====================================================
