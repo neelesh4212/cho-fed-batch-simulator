@@ -600,7 +600,7 @@ def main():
     connection.execute("""
         CREATE TABLE IF NOT EXISTS simulation_results (
             Simulation_ID INTEGER,
-            Days INTEGER,
+            Days REAL,
             Glucose REAL,
             Product REAL,
             Lactate REAL,

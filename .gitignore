@@ -1,3 +1,11 @@
 .venv/
 __pycache__/
 .ipynb_checkpoints/
+
+# Local, recoverable experiments; not part of the active release.
+archive/
+*_before_days_real.db
+*.db-journal
+*.db-wal
+*.db-shm
+tests/tmp*/
