@@ -1,6 +1,6 @@
 # CHO Fed-Batch Simulator
 
-A student-built Python simulator for Chinese hamster ovary (CHO) cell culture,
+I built this Python simulator for Chinese hamster ovary (CHO) cell culture,
 with SQLite run tracking and a Power BI dashboard for exploring feeding scenarios.
 Developed to learn how bioprocess equations become a reproducible computational
 workflow. This is an educational simulator, not an experimentally validated
@@ -190,14 +190,13 @@ It is not the active model and its tests do not validate this release.
 
 The next learning-focused release will add ODE integration and PLC-inspired
 control simulation: separate controller timing, manual/automatic/off modes,
-pump limits, interlocks, and operating-scenario tests. Physical reactor
-integration and ML are outside the current project endpoint.
+pump limits, interlocks, and operating-scenario tests. 
 
 ## Development approach
 
-Most simulator code was written by the student author. AI was used for concept
+Most simulator code was written by me. AI was used for concept
 explanations and review, with implementation assistance during final refinements,
-testing, and release preparation. The project builds on undergraduate exposure
+testing, and release preparation. The project builds on my undergraduate exposure
 to bioprocess simulation through independent implementation and exploration.
 
 ## Reproducing the demo
