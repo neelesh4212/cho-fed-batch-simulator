@@ -1,0 +1,9 @@
+[
+  {
+    "Simulation_ID": 1,
+    "Scenario": "Baseline",
+    "Created_UTC": "20261008T134812025101Z",
+    "Model_Version": "2.0-ode",
+    "Parameters_JSON": "{\"Ka\": 2.0, \"Kl\": 4.0, \"Ks\": 2.0, \"dt\": 1.0, \"duration\": 14.0, \"feed_glucose\": 100.0, \"feed_rate_on\": 0.1, \"glucose_target\": 10.0, \"glucose_uptake_K\": 0.1, \"initial_glucose\": 8.0, \"initial_viable_cells\": 1.0, \"initial_volume\": 1.0, \"kd_max\": 0.2, \"kd_min\": 0.02, \"lactate_uptake_K\": 0.1, \"max_feed_volume\": 1.5, \"mu_max\": 0.4, \"mu_switch\": 0.15, \"qA\": 40.0, \"qG\": 600.0, \"qL_consumption\": 50.0, \"qL_production\": 250.0, \"qp\": 30.0, \"reactor_capacity\": 2.0, \"switch_steepness\": 20.0}"
+  }
+]

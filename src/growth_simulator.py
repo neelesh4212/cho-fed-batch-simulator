@@ -2,11 +2,45 @@ import numpy as np
 import pandas as pd
 import sqlite3
 import matplotlib.pyplot as plt
+from pathlib import Path
+import json
+from datetime import datetime, timezone
 
 
 # =====================================================
 # MODEL FUNCTIONS
 # =====================================================
+
+# CHANGED: fixed reference settings for automatic scenario classification.
+BASELINE_PARAMETERS = {
+    "simulation_duration": 14.0, "dt": 0.125, "controller_interval": 1.0,
+    "initial_volume": 1.0, "initial_glucose": 8.0, "initial_cells": 1.0,
+    "initial_product": 0.0, "initial_dead_cells": 0.0,
+    "initial_lactate": 0.0, "initial_ammonia": 0.0,
+    "feed_glucose": 100.0, "feed_rate_on": 0.1, "glucose_target": 10.0,
+    "max_feed_volume": 1.5, "mu_max": 0.4, "Ks": 2.0, "Kl": 4.0,
+    "Ka": 2.0, "qG": 600.0, "qp": 30.0, "qA": 40.0,
+    "qL_production": 250.0, "qL_consumption": 50.0,
+    "mu_switch": 0.15, "switch_steepness": 20.0,
+    "kd_min": 0.02, "kd_max": 0.20,
+}
+
+
+def classify_scenario(parameters):
+    labels = {
+        "feed_glucose": "feed glucose", "feed_rate_on": "feed rate",
+        "initial_glucose": "initial glucose", "glucose_target": "target glucose",
+    }
+    changes = []
+    for name, baseline in BASELINE_PARAMETERS.items():
+        value = parameters[name]
+        if value != baseline:
+            if name in labels:
+                direction = "higher" if value > baseline else "lower"
+                changes.append(f"{direction} {labels[name]}: {value:g}")
+            else:
+                changes.append(f"{name}={value:g}")
+    return "; ".join(changes) if changes else "Baseline"
 
 def calculate_health(glucose, lactate, ammonia, Ks, Kl, Ka):
     glucose_factor = glucose / (Ks + glucose)
@@ -111,24 +145,25 @@ def update_metabolites(
 
 
 def update_cells(viable_cells_previous, reactor_volume_previous, reactor_volume_new, dead_cells_previous, mu, kd, dt):
+    # CHANGED: solve growth and death together with rates held constant over dt.
     viable_cells_previous_mass = viable_cells_previous * 1e9 * reactor_volume_previous  # cells
-    new_cells = calculate_growth(viable_cells_previous, mu, dt)  # million cells/mL
-    new_cells_mass = new_cells * 1e9 * reactor_volume_previous  # cells
+    net_growth_rate = mu - kd  # 1/day
+    viable_cells_new_mass = viable_cells_previous_mass * np.exp(net_growth_rate * dt)  # cells
 
-    dead_today = kd * viable_cells_previous * dt  # million cells/mL
-    dead_today = min(dead_today, viable_cells_previous + new_cells)
-    dead_today_mass = dead_today * 1e9 * reactor_volume_previous  # cells
+    # CHANGED: integrate viable cell exposure to count deaths during the step.
+    if abs(net_growth_rate * dt) < 1e-8:
+        viable_cell_exposure = viable_cells_previous_mass * dt  # cell.day
+    else:
+        viable_cell_exposure = (
+            viable_cells_previous_mass * np.expm1(net_growth_rate * dt) / net_growth_rate
+        )  # cell.day
+    dead_today_mass = kd * viable_cell_exposure  # cells
 
-    viable_cells_new = (((viable_cells_previous_mass + new_cells_mass - dead_today_mass)/
-                        reactor_volume_new/
-                        1e9)
-    )  # million cells/mL
-    viable_cells_new = max(viable_cells_new, 0)
-
-    dead_cells_new = (((dead_cells_previous * 1e9 * reactor_volume_previous) + dead_today_mass) / 
-                      reactor_volume_new / 
-                      1e9
-    )  # million cells/mL
+    # CHANGED: volume balance accounts for dilution once, after biological change.
+    viable_cells_new = viable_cells_new_mass / reactor_volume_new / 1e9  # million cells/mL
+    dead_cells_new = (
+        dead_cells_previous * 1e9 * reactor_volume_previous + dead_today_mass
+    ) / reactor_volume_new / 1e9  # million cells/mL
 
     return viable_cells_new, dead_cells_new
 
@@ -295,7 +330,27 @@ def main():
     # Simulation settings
     # ----------------------------
 
-    days = np.arange(0, 15)  # days
+    # CHANGED: timestamps follow dt and include the exact simulation endpoint.
+    simulation_duration = 14.0  # days
+    # CHANGED: label this run for the Power BI scenario slicer; update when parameters change.
+    # Scenario is now generated automatically from the parameters below.
+    dt = 0.125  # days, three-hour biological steps
+    # CHANGED: feed decisions remain daily, independent of biological step size.
+    controller_interval = 1.0  # days between feed-command calculations
+    # FUTURE: online glucose sensing, measurement delays, and shorter control intervals.
+
+    if not np.isfinite(dt) or dt <= 0:
+        raise ValueError("dt must be finite and greater than zero.")
+    if not np.isfinite(simulation_duration) or simulation_duration <= 0:
+        raise ValueError("simulation_duration must be finite and greater than zero.")
+    if not np.isfinite(controller_interval) or controller_interval <= 0:
+        raise ValueError("controller_interval must be finite and greater than zero.")
+
+    days = np.arange(0.0, simulation_duration, dt)  # days
+    days = np.append(days, simulation_duration)  # days
+    # CHANGED: split biological intervals at every controller update time.
+    controller_times = np.arange(0.0, simulation_duration, controller_interval)  # days
+    days = np.unique(np.concatenate((days, controller_times)))  # days, sorted
     
     reactor_volume = np.empty(len(days))  # L
     feed_rate = np.zeros(len(days))  # L/day
@@ -327,7 +382,7 @@ def main():
     # Feed Parameters
     # ----------------------------
 
-    feed_glucose = 120.0  # g/L, glucose concentration in feed
+    feed_glucose = 100.0  # g/L, glucose concentration in feed
     feed_rate_on = 0.1  # L/day
     glucose_target = 10.0  # g/L, target glucose concentration
     max_feed_volume = 1.5  # L, maximum reactor volume for feeding
@@ -357,14 +412,28 @@ def main():
     mu_switch = 0.15  # 1/day
     switch_steepness = 20.0  # dimensionless, controls LP -> LC transition
 
-    dt = 1.0  # days
-
     # ----------------------------
     # Death Parameters
     # ----------------------------
 
     kd_min = 0.02  # 1/day, death rate under healthier conditions
     kd_max = 0.20  # 1/day, death rate under stressed conditions
+
+    # CHANGED: snapshot all settings before simulation changes the state arrays.
+    settings = locals().copy()
+    parameters = {
+        name: float(settings[name])
+        for name in BASELINE_PARAMETERS if name in settings
+    }
+    parameters.update({
+        "initial_volume": float(reactor_volume[0]),
+        "initial_glucose": float(glucose[0]),
+        "initial_product": float(product[0]),
+        "initial_dead_cells": float(dead_cells[0]),
+        "initial_lactate": float(lactate[0]),
+        "initial_ammonia": float(ammonia[0]),
+    })
+    scenario = classify_scenario(parameters)
 
     initial_health = calculate_health(
         glucose[0],
@@ -398,16 +467,37 @@ def main():
     # Simulation Loop
     # ----------------------------
 
+    # CHANGED: hold the feed command between scheduled controller updates.
+    controller_index = 0
+    feed_command = 0.0  # L/day
+
     for i in range(1, len(days)):
 
-        feed_rate[i-1] = calculate_feed_rate(
-            reactor_volume[i-1],
-            max_feed_volume,
-            glucose[i-1],
-            glucose_target,
-            feed_rate_on,
-            dt,
-        )
+        # CHANGED: the last interval may be shorter than the configured dt.
+        dt_step = days[i] - days[i-1]  # days
+
+        if (
+            controller_index < len(controller_times)
+            and days[i-1] >= controller_times[controller_index]
+        ):
+            command_duration = min(
+                controller_interval, simulation_duration - days[i-1]
+            )  # days until the next controller decision or simulation endpoint
+            feed_command = calculate_feed_rate(
+                reactor_volume[i-1],
+                max_feed_volume,
+                glucose[i-1],
+                glucose_target,
+                feed_rate_on,
+                command_duration,
+            )  # L/day, held until the next daily decision
+            controller_index += 1
+
+        # CHANGED: volume protection still applies between controller decisions.
+        max_allowed_feed_rate = max(
+            (max_feed_volume - reactor_volume[i-1]) / dt_step, 0.0
+        )  # L/day
+        feed_rate[i-1] = min(feed_command, max_allowed_feed_rate)  # L/day, applied flow
 
         health_factor = calculate_health(
             glucose[i-1],
@@ -418,10 +508,11 @@ def main():
             Ka,
         )
 
-        mu[i] = mu_max * health_factor  # 1/day
+        # CHANGED: starting-condition rates advance the interval, not the plotted endpoint.
+        mu_for_step = mu_max * health_factor  # 1/day
 
         current_metabolic_state = calculate_metabolic_state(
-            mu[i],
+            mu_for_step,
             mu_switch,
             switch_steepness,
         )
@@ -431,10 +522,7 @@ def main():
             - (1 - current_metabolic_state) * qL_consumption
         )  # pg/(cell.day)
 
-        metabolic_state[i] = current_metabolic_state
-        dynamic_qL[i] = qL_dynamic
-
-        kd[i] = calculate_death_rate(
+        kd_for_step = calculate_death_rate(
             health_factor,
             kd_min,
             kd_max,
@@ -443,7 +531,7 @@ def main():
         reactor_volume[i] = update_reactor_volume(
             reactor_volume[i-1],
             feed_rate[i-1],
-            dt,
+            dt_step,  # CHANGED: actual interval duration
         )
 
         glucose[i], product[i], lactate[i], ammonia[i] = update_metabolites(
@@ -461,7 +549,7 @@ def main():
             qL_dynamic,
             qA,
             health_factor,
-            dt,
+            dt_step,  # CHANGED: actual interval duration
         )
 
         viable_cells[i], dead_cells[i] = update_cells(
@@ -469,20 +557,45 @@ def main():
             reactor_volume[i-1],
             reactor_volume[i],
             dead_cells[i-1],
-            mu[i],
-            kd[i],
-            dt,
+            mu_for_step,
+            kd_for_step,
+            dt_step,  # CHANGED: actual interval duration
         )
+
+        # CHANGED: store rates corresponding to the updated concentrations at day i.
+        endpoint_health = calculate_health(
+            glucose[i], lactate[i], ammonia[i], Ks, Kl, Ka,
+        )
+        mu[i] = mu_max * endpoint_health  # 1/day
+        kd[i] = calculate_death_rate(endpoint_health, kd_min, kd_max)  # 1/day
+        metabolic_state[i] = calculate_metabolic_state(
+            mu[i], mu_switch, switch_steepness,
+        )  # dimensionless, 0-1
+        dynamic_qL[i] = (
+            metabolic_state[i] * qL_production
+            - (1 - metabolic_state[i]) * qL_consumption
+        )  # pg/(cell.day)
 
     # ----------------------------
     # Derived Variables
     # ----------------------------
 
+    # CHANGED: no feeding interval follows the final timestamp; export blank/SQL NULL.
+    feed_rate[-1] = np.nan  # L/day, not applicable at the simulation endpoint
+
     total_cells = viable_cells + dead_cells  # million cells/mL
     viability = viable_cells / total_cells * 100  # %
+    # CHANGED: integrate applied flow over each interval; exclude the final missing rate.
+    total_feed = np.sum(feed_rate[:-1] * np.diff(days))  # L delivered
 
+    # CHANGED: resolve output paths from the script, not the terminal directory.
+    project_root = Path(__file__).resolve().parents[1]
+    database_path = project_root / "data" / "database" / "cho_digital_twin.db"
 
-    connection = sqlite3.connect("data/database/cho_digital_twin.db")
+    # CHANGED: create output folders if they do not already exist.
+    database_path.parent.mkdir(parents=True, exist_ok=True)
+
+    connection = sqlite3.connect(str(database_path))
     
     connection.execute("""
         CREATE TABLE IF NOT EXISTS simulation_results (
@@ -511,6 +624,10 @@ def main():
     """)
 
     simulation_id = next_sim_id.fetchone()[0]
+
+    # CHANGED: use the database simulation ID to give each run its own CSV filename.
+    csv_path = project_root / "data" / "csv" / f"simulation_{simulation_id}.csv"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
 
     # =====================================================
     # CREATING DATAFRAMES
@@ -561,10 +678,41 @@ def main():
         index=False
     )
 
+    # CHANGED: save one summary row with the same ID as this run's time-series results.
+    simulation_summary = pd.DataFrame([{
+        "Simulation_ID": simulation_id,
+        "Simulation_Days": days[-1] - days[0],  # days
+        "Final_Product": product[-1],  # g/L
+        "Final_Lactate": lactate[-1],  # g/L
+        "Final_Ammonia": ammonia[-1],  # g/L
+        "Final_Viability": viability[-1],  # %
+        "Minimum_Glucose": np.min(glucose),  # g/L, sampled timestamps
+        "Maximum_Glucose": np.max(glucose),  # g/L, sampled timestamps
+        "Final_Volume": reactor_volume[-1],  # L
+        "Total_Feed": total_feed,  # L delivered
+        "Scenario": scenario,
+    }])
+    simulation_summary.to_sql(
+        "simulation_summary",
+        connection,
+        if_exists="append",
+        index=False,
+    )
+
+    # CHANGED: retain reproducible settings without changing Power BI's existing tables.
+    run_metadata = pd.DataFrame([{
+        "Simulation_ID": simulation_id,
+        "Scenario": scenario,
+        "Created_UTC": datetime.now(timezone.utc).isoformat(),
+        "Model_Version": "interval_exponential_v1",
+        "Parameters_JSON": json.dumps(parameters, sort_keys=True),
+    }])
+    run_metadata.to_sql("simulation_metadata", connection, if_exists="append", index=False)
+
     connection.close()
 
     results.to_csv(
-    "data/csv/simulation_2026-08-12_1125.csv",
+    csv_path,
     index=False
     )
 
