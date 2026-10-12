@@ -34,7 +34,7 @@ class WebSimulationTests(unittest.TestCase):
         app = AppTest.from_file(str(ROOT / "streamlit_app.py")).run(timeout=30)
         self.assertEqual(len(app.exception), 0)
         self.assertEqual(app.metric[0].value, "0.38 g/L")
-        next(x for x in app.number_input if x.label == "Feed glucose (g/L)").set_value(150.0)
+        next(x for x in app.number_input if x.label == "Feed Glucose (g/L)").set_value(150.0)
         app.button[0].click().run(timeout=30)
         self.assertEqual(len(app.exception), 0)
         self.assertEqual(app.metric[0].value, "0.42 g/L")
