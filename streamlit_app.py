@@ -67,9 +67,9 @@ with dynamics:
     # Explicit interval widths distinguish a held flow from instantaneous pulses.
     fig.add_trace(go.Bar(x=(data.Days.iloc[:-1].to_numpy()+data.Days.iloc[1:].to_numpy())/2,
                         y=data.Feed_Rate.iloc[:-1], width=data.Days.diff().iloc[1:],
-                        name="Feed rate", marker_color="#e99a26", opacity=0.65), secondary_y=False)
+                        name="Feed rate", marker_color="#e99a26", marker_line_width=0, opacity=1.0), secondary_y=False)
     fig.add_trace(go.Scatter(x=data.Days, y=data.Glucose, name="Glucose", mode="lines", line_color="#2878b5"), secondary_y=True)
-    fig.update_layout(title="Glucose and feeding", template="plotly_white", height=300, margin=dict(l=10,r=10,t=45,b=10), legend=dict(orientation="h", y=1.15), xaxis_title="Time (days)")
+    fig.update_layout(title="Glucose and feeding", template="plotly_white", bargap=0, bargroupgap=0, height=300, margin=dict(l=10,r=10,t=45,b=10), legend=dict(orientation="h", y=1.15), xaxis_title="Time (days)")
     fig.update_yaxes(title_text="Feed (L/day)", rangemode="tozero", secondary_y=False)
     fig.update_yaxes(title_text="Glucose (g/L)", rangemode="tozero", secondary_y=True)
     right.plotly_chart(fig, width="stretch")
