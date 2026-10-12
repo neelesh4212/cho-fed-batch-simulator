@@ -31,6 +31,26 @@ outcomes, not measurements from a physical reactor.
 
 ## Installation
 
+### Interactive web app
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m streamlit run streamlit_app.py
+```
+
+Open the local URL printed by Streamlit. The app provides initial-condition and
+feeding controls, KPI cards, interactive Plotly charts, and CSV/parameter downloads.
+It runs in session memory and does not append to the SQLite database.
+The original desktop script and Power BI report remain available.
+
+The in-memory adapter reuses the original biological helper functions. Automated
+tests compare every timestamp and output against all eight published demo runs.
+Run the full suite with the test command below, including Streamlit AppTest checks.
+
+For Streamlit Community Cloud, select this repository, the main branch, and
+`streamlit_app.py` as the entry point. Deployment is a separate step; this
+repository does not yet specify a public hosted-app URL.
+
 The current environment was tested with Python 3.14.5, NumPy 2.4.6,
 pandas 3.0.3, and Matplotlib 3.11.0 on Windows. A fresh isolated environment
 also passed all 12 tests with NumPy 2.5.4, pandas 3.0.6, and Matplotlib 3.11.2.
@@ -147,11 +167,13 @@ updating any fixed-label baseline formatting in the report.
 
 ## Tests
 
-The active suite has 12 tests covering volume, feed switching/caps, health,
+The active suite has 15 tests covering volume, feed switching/caps, health,
 death-rate endpoints, lactate switching, growth/death/dilution, metabolite
 balances, depletion caps, scenario labels, and the main export workflow.
 The workflow test uses an in-memory database and a temporary folder and
-suppresses plots; it does not write to the real project exports.
+suppresses plots; it does not write to the real project exports. Additional web
+tests cover invalid settings, exact agreement with all eight demo scenarios,
+and Streamlit's initial run and form submission.
 
 Tests check implementation behavior, not experimental accuracy. A step-size
 comparison gave final product values of 0.410280 g/L at dt=1 day,
@@ -188,9 +210,12 @@ It is not the active model and its tests do not validate this release.
 
 ## Roadmap
 
-The next learning-focused release will add ODE integration and PLC-inspired
-control simulation: separate controller timing, manual/automatic/off modes,
-pump limits, interlocks, and operating-scenario tests. 
+<<<<<<< HEAD
+The project endpoint is the educational interval simulator, interactive web app,
+and Power BI dashboard. ODE integration and PLC-inspired control are optional
+future extensions, not required release milestones. Physical reactor integration
+and ML are outside the current scope.
+>>>>>>> 5d51069 (Add Streamlit simulator app with interactive charts and downloads)
 
 ## Development approach
 
