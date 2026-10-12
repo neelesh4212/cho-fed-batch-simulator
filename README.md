@@ -1,5 +1,9 @@
 # CHO Fed-Batch Simulator
 
+**[Try the interactive web app](https://cho-fed-batch-simulator-x2h6savbgjenxhytm26jjw.streamlit.app/)**
+
+Open the hosted app in your browser; no download or local Python installation is required.
+
 I built this Python simulator for Chinese hamster ovary (CHO) cell culture,
 with SQLite run tracking and a Power BI dashboard for exploring feeding scenarios.
 Developed to learn how bioprocess equations become a reproducible computational
@@ -48,8 +52,8 @@ tests compare every timestamp and output against all eight published demo runs.
 Run the full suite with the test command below, including Streamlit AppTest checks.
 
 For Streamlit Community Cloud, select this repository, the main branch, and
-`streamlit_app.py` as the entry point. Deployment is a separate step; this
-repository does not yet specify a public hosted-app URL.
+`streamlit_app.py` as the entry point. The public deployment is linked at the
+top of this README; the commands above are for running a local copy.
 
 The current environment was tested with Python 3.14.5, NumPy 2.4.6,
 pandas 3.0.3, and Matplotlib 3.11.0 on Windows. A fresh isolated environment
