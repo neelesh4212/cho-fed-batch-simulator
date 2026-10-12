@@ -94,4 +94,4 @@ with table:
     st.download_button("Download Parameters", json.dumps(parameters, indent=2), "parameters.json", "application/json")
     st.dataframe(data, hide_index=True, width="stretch")
 with st.expander("Model Assumptions"):
-    st.markdown("Parameters are illustrative and have not been experimentally validated. Rates are held constant within each three-hour step. Metabolites use the starting viable-cell population. Feeding decisions are daily. No oxygen, pH, glutamine, sampling losses or dead-cell lysis are modeled. Glucose uptake is capped, but growth is not recalculated at an intra-step depletion event. Runs are held in session memory; no shared database is updated.")
+    st.markdown("Parameters are illustrative and have not been experimentally validated. Rates are held constant within each three-hour step. Metabolites use the starting viable-cell population. Feeding decisions are daily. No oxygen, pH, glutamine, sampling losses or dead-cell lysis are modeled. Glucose uptake is capped.")
